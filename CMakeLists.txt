@@ -16,7 +16,7 @@ set(CMAKE_CXX_STANDARD          20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS        OFF)
 
-include_directories(./include) 
+include_directories(./include/algorithm/ ./include/geom_primitives/ ./include/octree/ ./include/vulkan) 
 
 add_subdirectory(test)
 add_subdirectory(task)
