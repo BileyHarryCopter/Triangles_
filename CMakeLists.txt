@@ -7,7 +7,9 @@ if (${PROJECT_SOURCE_DIR} STREQUAL ${PROJECT_BINARY_DIR})
     message(FATAL_ERROR "In-source build is forbidden")
 endif()
 
-find_package(Threads REQUIRED)
+find_package (Threads REQUIRED)
+find_package (Vulkan  REQUIRED)
+find_package (glfw3   REQUIRED)
 
 find_package(GTest REQUIRED)
 enable_testing()
@@ -16,7 +18,11 @@ set(CMAKE_CXX_STANDARD          20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS        OFF)
 
-include_directories(./include/algorithm/ ./include/geom_primitives/ ./include/octree/ ./include/vulkan) 
+include_directories(./include/octree/ 
+                    ./include/vulkan/
+                    ./include/algorithm/ 
+                    ./include/geom_primitives/) 
 
 add_subdirectory(test)
 add_subdirectory(task)
+add_subdirectory(src)
