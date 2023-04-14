@@ -37,7 +37,7 @@ public:
 
     VkRenderPass get_renderpass() { return renderpass_; }
 
-    void bind_with_cmdbuffer(VkCommandBuffer commandBuffer);
+    void bind(VkCommandBuffer commandBuffer);
 };
 
 }   //  end of VKPipeline namespace

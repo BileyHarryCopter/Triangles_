@@ -5,7 +5,17 @@ namespace VKRenderer
     Renderer::Renderer (VKDevice::Device& device, VKSwapchain::Swapchain& swapchain, VKPipeline::Pipeline& pipeline) : 
                         device_{device}, swapchain_{swapchain}, pipeline_{pipeline}
     {
+        loadModels();
         createCommandBuffers();
+    }
+
+    void Renderer::loadModels()
+    {
+        //  here the logical part of the intersection of tringles should be connected with visualization part
+        std::vector<VKModel::Vertex> vertices {{{0.0, 0.5}}, {{-0.25, 0.0}}, {{0.25, 0.0}},
+                                               {{0.0,-0.1}}, {{0.25, -0.5}}, {{-0.25,-0.5}}};
+
+        model_ = std::make_unique<VKModel::Model>(device_, vertices);
     }
 
     void Renderer::createCommandBuffers()
@@ -47,9 +57,6 @@ namespace VKRenderer
 
         vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-        //  hear we need to bind pipeline
-        pipeline_.bind_with_cmdbuffer(commandBuffer);
-
         VkViewport viewport{};
         viewport.x        =                            0.0f;
         viewport.y        =                            0.0f;
@@ -63,6 +70,11 @@ namespace VKRenderer
         scissor.offset =          {0, 0};
         scissor.extent = swapchain_extent;
         vkCmdSetScissor(commandBuffer, 0, 1, &scissor);            
+
+        //  hear we need to bind pipeline
+        pipeline_.bind(commandBuffer);
+        model_ -> bind(commandBuffer);
+        model_ -> draw(commandBuffer);
 
         vkCmdDraw(commandBuffer, 3, 1, 0, 0);
 

@@ -8,6 +8,7 @@
 #include "device.hpp"
 #include "pipeline.hpp"
 #include "swapchain.hpp"
+#include "model.hpp"
 
 namespace VKRenderer
 {
@@ -20,6 +21,8 @@ class Renderer final
     VKPipeline::Pipeline&                    pipeline_;
     std::vector<VkCommandBuffer>        commandbuffer_;
 
+    std::unique_ptr<VKModel::Model>             model_;
+
 public:
 
     Renderer (VKDevice::Device& device, VKSwapchain::Swapchain& swapchain, VKPipeline::Pipeline& pipeline);
@@ -28,7 +31,7 @@ public:
     void drawFrame();
 
 private:
-
+    void loadModels();
     void createCommandBuffers();
     void recordCommandBuffer(VkCommandBuffer commandbuffer, uint32_t imageIndex);
 };

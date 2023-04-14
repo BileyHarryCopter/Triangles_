@@ -1,5 +1,7 @@
 #include "pipeline.hpp"
 
+#include "model.hpp"
+
 namespace VKPipeline
 {
 
@@ -54,10 +56,15 @@ namespace VKPipeline
 
         VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
 
+
+        auto   binding_descriptions =   VKModel::Vertex::get_binding_descriptions();
+        auto attribute_descriptions = VKModel::Vertex::get_attribute_descriptions();
         VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
-        vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-        vertexInputInfo.vertexBindingDescriptionCount                                 = 0;
-        vertexInputInfo.vertexAttributeDescriptionCount                               = 0;
+        vertexInputInfo.sType                      = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+        vertexInputInfo.vertexBindingDescriptionCount   = static_cast<uint32_t>(  binding_descriptions.size());
+        vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attribute_descriptions.size());
+        vertexInputInfo.pVertexBindingDescriptions      =                          binding_descriptions.data();
+        vertexInputInfo.pVertexAttributeDescriptions    =                        attribute_descriptions.data();
 
         VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
         inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -138,7 +145,7 @@ namespace VKPipeline
             throw std::runtime_error("failed to create graphics pipeline!");
     }
 
-    void Pipeline::bind_with_cmdbuffer(VkCommandBuffer commandBuffer)
+    void Pipeline::bind(VkCommandBuffer commandBuffer)
     {
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicspipeline_);
     }
