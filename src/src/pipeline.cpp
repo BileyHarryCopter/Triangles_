@@ -107,6 +107,13 @@ namespace VKPipeline
         colorBlending.blendConstants[2] =                                                     0.0f;
         colorBlending.blendConstants[3] =                                                     0.0f;
 
+        VkPipelineDepthStencilStateCreateInfo depthStencilInfo;
+        depthStencilInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+        depthStencilInfo.depthTestEnable  =                                         VK_TRUE;
+        depthStencilInfo.depthWriteEnable =                                         VK_TRUE;
+        depthStencilInfo.depthCompareOp   =                              VK_COMPARE_OP_LESS;
+        depthStencilInfo.depthBoundsTestEnable =                                   VK_FALSE;
+        depthStencilInfo.stencilTestEnable     =                                   VK_FALSE;
 
         std::vector<VkDynamicState> dynamicStates = {
             VK_DYNAMIC_STATE_VIEWPORT,
@@ -120,8 +127,9 @@ namespace VKPipeline
         VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
         pipelineLayoutInfo.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         pipelineLayoutInfo.setLayoutCount         =                                             0;
+        pipelineLayoutInfo.pSetLayouts            =                                       nullptr;
         pipelineLayoutInfo.pushConstantRangeCount =                                             0;
-
+        pipelineLayoutInfo.pPushConstantRanges    =                                       nullptr;
         if (vkCreatePipelineLayout(device_, &pipelineLayoutInfo, nullptr, &pipelinelayout_) != VK_SUCCESS)
             throw std::runtime_error("failed to create pipeline layout!");
 
@@ -135,6 +143,7 @@ namespace VKPipeline
         pipelineInfo.pRasterizationState =                                     &rasterizer;
         pipelineInfo.pMultisampleState   =                                  &multisampling;
         pipelineInfo.pColorBlendState    =                                  &colorBlending;
+        pipelineInfo.pDepthStencilState  =                               &depthStencilInfo;
         pipelineInfo.pDynamicState       =                                   &dynamicState;
         pipelineInfo.layout              =                                 pipelinelayout_;
         pipelineInfo.renderPass          =                                     renderpass_;

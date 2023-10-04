@@ -9,3 +9,16 @@ target_include_directories (VKSOURCES
 )
 
 target_link_libraries (VKSOURCES glfw vulkan dl X11 Xxf86vm Xrandr Xi)
+
+# a part which necessary for compiling .vert and .frag files
+add_custom_command(
+    OUTPUT frag.spv
+    COMMAND glslc ${CMAKE_CURRENT_SOURCE_DIR}/src/src/shader.frag -o frag.spv
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/src/shader.frag
+    VERBATIM)
+
+add_custom_command(
+    OUTPUT vert.spv
+    COMMAND glslc ${CMAKE_CURRENT_SOURCE_DIR}/src/src/shader.vert -o vert.spv
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/src/shader.vert
+    VERBATIM)

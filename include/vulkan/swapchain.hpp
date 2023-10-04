@@ -3,6 +3,7 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
+#include <array>
 #include <vector>
 
 #include "device.hpp"
@@ -28,11 +29,15 @@ class Swapchain final
     VkRenderPass                              renderpass_;
     
     std::vector<VkImage>                 swapchainimages_;
-    
+    std::vector<VkImageView>         swapchainimageviews_;
+
+    std::vector<VkImage>                     depthimages_;
+    std::vector<VkDeviceMemory>        depthimagememorys_;
+    std::vector<VkImageView>             depthimageviews_;
+
     VkFormat                        swapchainimageformat_;
     VkExtent2D                           swapchainextent_;
 
-    std::vector<VkImageView>         swapchainimageviews_;
     std::vector<VkFramebuffer>     swapchainframebuffers_;
 
     std::vector<VkSemaphore>     imageavailablesemaphore_;

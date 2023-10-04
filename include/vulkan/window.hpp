@@ -9,8 +9,8 @@
 namespace VKWindow
 {
 
-constexpr std::size_t DEFAULT_WIDTH         =  800;
-constexpr std::size_t DEFAULT_HEIGHT        =  600;
+constexpr std::size_t DEFAULT_WIDTH         = 1400;
+constexpr std::size_t DEFAULT_HEIGHT        =  900;
 const     std::string DEFAULT_WINDOW_NAME   = "VK";
 
 class Window final
@@ -43,8 +43,9 @@ public:
     Window (const Window& window) = delete;
     Window &operator=(const Window &window) = delete;
 
-    bool shouldClose()  { return glfwWindowShouldClose(window_); }
-    window_ptr get()    { return window_; };
+    bool shouldClose()           { return glfwWindowShouldClose(window_); }
+    window_ptr get()                                    { return window_; }
+    VkExtent2D get_extent() {return {(uint32_t)width_, (uint32_t)height_};}
 };
 
 }   //  end of VKWindow class

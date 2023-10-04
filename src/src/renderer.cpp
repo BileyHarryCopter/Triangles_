@@ -12,8 +12,12 @@ namespace VKRenderer
     void Renderer::loadModels()
     {
         //  here the logical part of the intersection of tringles should be connected with visualization part
-        std::vector<VKModel::Vertex> vertices {{{0.0, 0.5}}, {{-0.25, 0.0}}, {{0.25, 0.0}},
-                                               {{0.0,-0.1}}, {{0.25, -0.5}}, {{-0.25,-0.5}}};
+        std::vector<VKModel::Vertex> vertices 
+        {
+            {{ 0.0, 0.5}, { 1.0, 0.0, 0.0}}, 
+            {{-0.5,-0.5}, { 0.0, 1.0, 0.0}}, 
+            {{ 0.5,-0.5}, { 0.0, 0.0, 1.0}}
+        };
 
         model_ = std::make_unique<VKModel::Model>(device_, vertices);
     }
@@ -67,7 +71,7 @@ namespace VKRenderer
         vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
         VkRect2D scissor{};
-        scissor.offset =          {0, 0};
+        scissor.offset =           {0, 0};
         scissor.extent = swapchain_extent;
         vkCmdSetScissor(commandBuffer, 0, 1, &scissor);            
 
