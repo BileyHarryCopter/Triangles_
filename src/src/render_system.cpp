@@ -15,7 +15,7 @@ namespace VKRenderSystem {
 
 struct SimplePushConstantData 
 {
-    glm::mat2 transform{1.f};
+    glm::mat4 transform{1.f};
     glm::vec2 offset;
     alignas(16) glm::vec3 color;
 };
@@ -68,13 +68,12 @@ struct SimplePushConstantData
 
         for (auto & object : objects)
         {
-            object.transform2D_.rotation = glm::mod(object.transform2D_.rotation + 0.0016f,
-                                                    glm::two_pi<float>());
+            object.transform3D_.rotation.y = glm::mod(object.transform3D_.rotation.y + 0.0016f, glm::two_pi<float>());
+            object.transform3D_.rotation.x = glm::mod(object.transform3D_.rotation.x + 0.0032f, glm::two_pi<float>());
 
             SimplePushConstantData                 push_data{};
-            push_data.offset = object.transform2D_.translation;
             push_data.color  =                   object.color_;
-            push_data.transform =   object.transform2D_.mat2();
+            push_data.transform =   object.transform3D_.mat4();
 
             vkCmdPushConstants (commandBuffer, pipelineLayout_, 
                                 VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
