@@ -2,24 +2,39 @@
 
 namespace VKRenderer
 {
-    Renderer::Renderer (VKDevice::Device& device, VKSwapchain::Swapchain& swapchain, VKPipeline::Pipeline& pipeline) : 
-                        device_{device}, swapchain_{swapchain}, pipeline_{pipeline}
+    Renderer::Renderer (VKWindow::Window& window, VKDevice::Device& device) : 
+                        window_{window}, device_{device}
     {
-        loadModels();
+        swapchain_ = std::make_unique<VKSwapchain::Swapchain>(window_, device_);
+        recreateSwapChain();
+
         createCommandBuffers();
     }
 
-    void Renderer::loadModels()
-    {
-        //  here the logical part of the intersection of tringles should be connected with visualization part
-        std::vector<VKModel::Vertex> vertices 
-        {
-            {{ 0.0, 0.5}, { 1.0, 0.0, 0.0}}, 
-            {{-0.5,-0.5}, { 0.0, 1.0, 0.0}}, 
-            {{ 0.5,-0.5}, { 0.0, 0.0, 1.0}}
-        };
+    Renderer::~Renderer () { freeCommandBuffers(); }
 
-        model_ = std::make_unique<VKModel::Model>(device_, vertices);
+    void Renderer::freeCommandBuffers()
+    {
+        vkFreeCommandBuffers(device_.get_logic(), device_.get_cmdpool(),
+                             static_cast<uint32_t>(commandbuffer_.size()), commandbuffer_.data());
+        commandbuffer_.clear();
+    }
+
+    void Renderer::recreateSwapChain()
+    {
+        auto extent = window_.get_extent();
+        while (extent.width == 0 || extent.height == 0)
+        {
+            auto extent = window_.get_extent();
+            glfwWaitEvents();
+        }
+        vkDeviceWaitIdle(device_.get_logic());
+
+        if (swapchain_->get_swapchain() == nullptr) 
+            swapchain_ = std::make_unique<VKSwapchain::Swapchain>(window_, device_);
+        else
+            swapchain_ = std::make_unique<VKSwapchain::Swapchain>(window_, device_, std::move(swapchain_));
+
     }
 
     void Renderer::createCommandBuffers()
@@ -34,30 +49,71 @@ namespace VKRenderer
 
         if (vkAllocateCommandBuffers(device_.get_logic(), &allocInfo, commandbuffer_.data()) != VK_SUCCESS)
             throw std::runtime_error("failed to allocate command buffers!");
-
-        for (auto imageindex = 0; imageindex < VKSwapchain::MAX_FRAMES_IN_FLIGHT; ++imageindex)
-            recordCommandBuffer(commandbuffer_[imageindex], imageindex);
     }
 
-    void Renderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) 
+    VkCommandBuffer Renderer::beginFrame()
     {
+        assert(!isFrameStarted_ && "Can't call beginFrame while rendering is processing");
+        auto result = swapchain_->acquireNextImage(&currentImageIndex_);
+
+        if (result == VK_ERROR_OUT_OF_DATE_KHR)
+        {
+            recreateSwapChain();
+            return nullptr;
+        }
+        if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
+            throw std::runtime_error("failed to acquire swapchain image");
+
+        isFrameStarted_ = true;
+
+        auto commandBuffer = get_currentcmdbuffer();
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
         if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS)
             throw std::runtime_error("failed to begin recording command buffer!");
 
-        auto swapchain_extent = swapchain_.get_extent();
-        VkRenderPassBeginInfo renderPassInfo{};
-        renderPassInfo.sType             = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        renderPassInfo.renderPass        =              swapchain_.get_renderpass();
-        renderPassInfo.framebuffer       =   swapchain_.get_framebuffer(imageIndex);
-        renderPassInfo.renderArea.offset =                                   {0, 0};
-        renderPassInfo.renderArea.extent =                         swapchain_extent;
+        return commandBuffer;
+    }
 
-        VkClearValue clearColor          = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
-        renderPassInfo.clearValueCount   =                            1;
-        renderPassInfo.pClearValues      =                  &clearColor;
+    void Renderer::endFrame()
+    {
+        assert(isFrameStarted_ && "Can't call endFrame while frame is not in progress");
+
+        auto commandBuffer = get_currentcmdbuffer();
+        if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
+            throw std::runtime_error("failed to record command buffer!");
+
+        auto result = swapchain_->submitCommandBuffers(&commandBuffer, &currentImageIndex_);
+        
+        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || window_.wasresized())
+        {
+            window_.resetresized();
+            recreateSwapChain();
+        }
+        else if (result != VK_SUCCESS)
+            throw std::runtime_error("failed to present swapchain image");
+
+        isFrameStarted_ = false;
+        currentImageIndex_ = (currentImageIndex_ + 1) % VKSwapchain::MAX_FRAMES_IN_FLIGHT;
+    }
+
+    void Renderer::beginSwapchainRenderpass(VkCommandBuffer commandBuffer)
+    {
+        assert(isFrameStarted_ && "Can't call beginSwapChainRenderPass if frame is not in progress");
+        assert(commandBuffer == get_currentcmdbuffer() && "Can't begining renderpass from different frames");
+        
+        auto swapchain_extent = swapchain_->get_extent();
+        VkRenderPassBeginInfo renderPassInfo{};
+        renderPassInfo.sType             =         VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderPassInfo.renderPass        =                     swapchain_->get_renderpass();
+        renderPassInfo.framebuffer       =  swapchain_->get_framebuffer(currentImageIndex_);
+        renderPassInfo.renderArea.offset =                                           {0, 0};
+        renderPassInfo.renderArea.extent =                                 swapchain_extent;
+
+        VkClearValue clearColor          = {{{0.01f, 0.01f, 0.01f, 1.0f}}};
+        renderPassInfo.clearValueCount   =                               1;
+        renderPassInfo.pClearValues      =                     &clearColor;
 
         vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
@@ -73,64 +129,15 @@ namespace VKRenderer
         VkRect2D scissor{};
         scissor.offset =           {0, 0};
         scissor.extent = swapchain_extent;
-        vkCmdSetScissor(commandBuffer, 0, 1, &scissor);            
+        vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+    }
 
-        //  hear we need to bind pipeline
-        pipeline_.bind(commandBuffer);
-        model_ -> bind(commandBuffer);
-        model_ -> draw(commandBuffer);
-
-        vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+    void Renderer::endSwapchainRenderpass(VkCommandBuffer commandBuffer)
+    {
+        assert(isFrameStarted_ && "Can't call endSwapChainRenderPass if frame is not in progress");
+        assert(commandBuffer == get_currentcmdbuffer() && "Can't end renderpass from different frames");
 
         vkCmdEndRenderPass(commandBuffer);
-
-        if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
-            throw std::runtime_error("failed to record command buffer!");
     }
 
-    void Renderer::drawFrame()
-    {
-        vkWaitForFences(device_.get_logic(), 1, &swapchain_.get_fence(), VK_TRUE, UINT64_MAX);
-        vkResetFences  (device_.get_logic(), 1, &swapchain_.get_fence());
-
-        uint32_t imageIndex;
-        vkAcquireNextImageKHR(device_.get_logic(), swapchain_.get_swapchain(), UINT64_MAX, 
-                              swapchain_.get_available_img_semaphore(), VK_NULL_HANDLE, &imageIndex);
-
-        vkResetCommandBuffer(commandbuffer_[swapchain_.get_index_currentframe()], 0);
-        recordCommandBuffer (commandbuffer_[swapchain_.get_index_currentframe()], imageIndex);
-
-        VkSubmitInfo submitInfo{};
-        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-
-        VkSemaphore      waitSemaphores[] =           {swapchain_.get_available_img_semaphore()};
-
-        VkPipelineStageFlags waitStages[] =      {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-        submitInfo.waitSemaphoreCount     =                                                    1;
-        submitInfo.pWaitSemaphores        =                                       waitSemaphores;
-        submitInfo.pWaitDstStageMask      =                                           waitStages;
-        submitInfo.commandBufferCount     =                                                    1;
-        submitInfo.pCommandBuffers        = &commandbuffer_[swapchain_.get_index_currentframe()];
-
-        VkSemaphore signalSemaphores[]    =           {swapchain_.get_finished_rndr_semaphore()};
-        submitInfo.signalSemaphoreCount   =                                                    1;
-        submitInfo.pSignalSemaphores      =                                     signalSemaphores;
-
-        if (vkQueueSubmit(device_.get_graphics_queue(), 1, &submitInfo, swapchain_.get_fence()) != VK_SUCCESS)
-            throw std::runtime_error("failed to submit draw command buffer!");
-
-        VkPresentInfoKHR presentInfo{};
-        presentInfo.sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-        presentInfo.waitSemaphoreCount =                                  1;
-        presentInfo.pWaitSemaphores    =                   signalSemaphores;
-
-        VkSwapchainKHR swapChains[] = {swapchain_.get_swapchain()};
-        presentInfo.swapchainCount  =                            1;
-        presentInfo.pSwapchains     =                   swapChains;
-        presentInfo.pImageIndices   =                  &imageIndex;
-
-        vkQueuePresentKHR(device_.get_present_queue(), &presentInfo);
-
-        swapchain_.currentframe_update();
-    }
 }

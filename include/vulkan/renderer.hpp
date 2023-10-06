@@ -4,11 +4,12 @@
 #include <GLFW/glfw3.h>
 
 #include <memory>
+#include <cassert>
 
 #include "device.hpp"
 #include "pipeline.hpp"
 #include "swapchain.hpp"
-#include "model.hpp"
+#include "object.hpp"
 
 namespace VKRenderer
 {
@@ -16,24 +17,42 @@ namespace VKRenderer
 class Renderer final
 {
 
+    VKWindow::Window&                          window_;
     VKDevice::Device&                          device_;
-    VKSwapchain::Swapchain&                 swapchain_;
-    VKPipeline::Pipeline&                    pipeline_;
+    std::unique_ptr<VKSwapchain::Swapchain> swapchain_;
     std::vector<VkCommandBuffer>        commandbuffer_;
 
-    std::unique_ptr<VKModel::Model>             model_;
+    uint32_t                    currentImageIndex_ = 0;
+    bool                       isFrameStarted_ = false;
 
 public:
 
-    Renderer (VKDevice::Device& device, VKSwapchain::Swapchain& swapchain, VKPipeline::Pipeline& pipeline);
-    ~Renderer() {};
+    Renderer (VKWindow::Window& window, VKDevice::Device& device);
+    ~Renderer();
 
-    void drawFrame();
+    //  functions for setting frames before drawing
+    VkCommandBuffer beginFrame();
+    void endFrame();
+    bool isFrameInProgress() const { return isFrameStarted_; }
+
+    //  function of connection with render system by command buffer
+    VkCommandBuffer get_currentcmdbuffer() const 
+    {
+        assert (isFrameStarted_ && "Cannot get commandbuffer while the frame is not processing");
+
+        return commandbuffer_[currentImageIndex_]; 
+    }
+
+    //  functions for setting renderpass
+    void beginSwapchainRenderpass(VkCommandBuffer commandBuffer);
+    void   endSwapchainRenderpass(VkCommandBuffer commandBuffer);
+    VkRenderPass getSwapChainRenderPass() const { return swapchain_->get_renderpass(); }
 
 private:
-    void loadModels();
     void createCommandBuffers();
     void recordCommandBuffer(VkCommandBuffer commandbuffer, uint32_t imageIndex);
+    void recreateSwapChain();
+    void freeCommandBuffers();
 };
 
 }   //  end of the VKRenderer namespace

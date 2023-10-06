@@ -5,6 +5,7 @@
 
 #include <array>
 #include <vector>
+#include <memory>
 
 #include "device.hpp"
 
@@ -26,6 +27,7 @@ class Swapchain final
     VKDevice::Device&                             device_;
     
     VkSwapchainKHR                             swapchain_;
+    VkSwapchainKHR                          oldswapchain_;
     VkRenderPass                              renderpass_;
     
     std::vector<VkImage>                 swapchainimages_;
@@ -43,13 +45,25 @@ class Swapchain final
     std::vector<VkSemaphore>     imageavailablesemaphore_;
     std::vector<VkSemaphore>     renderfinishedsemaphore_;
     std::vector<VkFence>                   inflightfence_;
+    std::vector<VkFence>                  imagesinflight_;
     std::size_t                         currentframe_ = 0;
 
 public:
 
     Swapchain (VKWindow::Window& window, VKDevice::Device& device);
+    Swapchain (VKWindow::Window& window, VKDevice::Device& device, std::shared_ptr<Swapchain> previous);
+
     ~Swapchain();
 
+    Swapchain(const Swapchain&) = delete;
+    Swapchain& operator=(const Swapchain&) = delete;
+
+    VkResult acquireNextImage(uint32_t *imageIndex);
+    VkResult submitCommandBuffers(const VkCommandBuffer *buffers, uint32_t *imageIndex);
+
+    size_t imageCount() { return swapchainimages_.size(); }
+
+    //  functions of connection
     VkSwapchainKHR        get_swapchain()       { return swapchain_; }
     const VkSwapchainKHR& get_swapchain() const { return swapchain_; }
 

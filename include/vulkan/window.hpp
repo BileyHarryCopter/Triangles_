@@ -24,8 +24,10 @@ class Window final
     str_t                window_name_;
     size_t width_    =              0,
            height_   =              0;
+    bool framebufferresized_  = false;  //  flag for resizing he window
 
     void initWindow();
+    static void framebufferresizedCallback (window_ptr window, int width, int height);
 
 public:
 
@@ -44,6 +46,9 @@ public:
     Window &operator=(const Window &window) = delete;
 
     bool shouldClose()           { return glfwWindowShouldClose(window_); }
+    bool wasresized()                       { return framebufferresized_; }
+    void resetresized()                    { framebufferresized_ = false; }
+
     window_ptr get()                                    { return window_; }
     VkExtent2D get_extent() {return {(uint32_t)width_, (uint32_t)height_};}
 };

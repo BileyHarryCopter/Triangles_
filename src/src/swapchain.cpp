@@ -16,19 +16,100 @@ namespace VKSwapchain
         createSyncObjects();
     }
 
+    Swapchain::Swapchain(VKWindow::Window& window, VKDevice::Device& device,
+                         std::shared_ptr<Swapchain> previous) : 
+                         device_{device}, surface_{device.get_surface()}
+    {
+        createSwapChain(window);
+        createImageViews();
+        createRenderPass();
+        createFramebuffers();
+        createSyncObjects();
+        oldswapchain_ = nullptr;
+    }
+
     Swapchain::~Swapchain()
     {
+        for (auto imageview : swapchainimageviews_)
+            vkDestroyImageView(device_.get_logic(), imageview, nullptr);
+        swapchainimageviews_.clear();
+
+        if (swapchain_ != nullptr)
+        {
+            vkDestroySwapchainKHR(device_.get_logic(), swapchain_, nullptr);
+            swapchain_ = nullptr;
+        }
+
+        for (auto framebuffer : swapchainframebuffers_)
+            vkDestroyFramebuffer(device_.get_logic(), framebuffer, nullptr);
+
+        vkDestroyRenderPass(device_.get_logic(), renderpass_, nullptr);
+
         for (auto i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
         {
             vkDestroySemaphore(device_.get_logic(), renderfinishedsemaphore_[i], nullptr);
             vkDestroySemaphore(device_.get_logic(), imageavailablesemaphore_[i], nullptr);
             vkDestroyFence    (device_.get_logic(),           inflightfence_[i], nullptr);
         }
+    }
 
-        for (auto imageview : swapchainimageviews_)
-            vkDestroyImageView(device_.get_logic(), imageview, nullptr);
+    VkResult Swapchain::acquireNextImage(uint32_t *imageIndex) 
+    { 
+        vkWaitForFences(device_.get_logic(), 1, &inflightfence_[currentframe_], VK_TRUE, std::numeric_limits<uint64_t>::max());
 
-        vkDestroySwapchainKHR(device_.get_logic(), swapchain_, nullptr);
+        auto result = vkAcquireNextImageKHR(device_.get_logic(), swapchain_, std::numeric_limits<uint64_t>::max(), 
+                                            imageavailablesemaphore_[currentframe_], VK_NULL_HANDLE, imageIndex);
+
+          //  adding with checking a value of currentImageIndex is realy important
+        if (*imageIndex >= MAX_FRAMES_IN_FLIGHT)
+            result = VK_ERROR_OUT_OF_DATE_KHR;
+
+        return result;
+    }
+
+    VkResult Swapchain::submitCommandBuffers(const VkCommandBuffer *buffers, uint32_t *imageIndex)
+    {
+        if (imagesinflight_[*imageIndex] != VK_NULL_HANDLE)
+            vkWaitForFences(device_.get_logic(), 1, &imagesinflight_[*imageIndex], VK_TRUE, UINT64_MAX);
+        imagesinflight_[*imageIndex] = inflightfence_[currentframe_];
+
+        VkSubmitInfo submitInfo{};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+        VkSemaphore      waitSemaphores[] =            {imageavailablesemaphore_[currentframe_]};
+
+        VkPipelineStageFlags waitStages[] =      {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+        submitInfo.waitSemaphoreCount     =                                                    1;
+        submitInfo.pWaitSemaphores        =                                       waitSemaphores;
+        submitInfo.pWaitDstStageMask      =                                           waitStages;
+        submitInfo.commandBufferCount     =                                                    1;
+        submitInfo.pCommandBuffers        =                                              buffers;
+
+        VkSemaphore signalSemaphores[]    =            {renderfinishedsemaphore_[currentframe_]};
+        submitInfo.signalSemaphoreCount   =                                                    1;
+        submitInfo.pSignalSemaphores      =                                     signalSemaphores;
+
+        vkResetFences  (device_.get_logic(), 1, &inflightfence_[currentframe_]);
+
+        auto result = vkQueueSubmit(device_.get_graphics_queue(), 1, &submitInfo, inflightfence_[currentframe_]);
+        if (result != VK_SUCCESS)
+            throw std::runtime_error("failed to submit draw command buffer!");
+        
+        VkPresentInfoKHR presentInfo{};
+        presentInfo.sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+        presentInfo.waitSemaphoreCount =                                  1;
+        presentInfo.pWaitSemaphores    =                   signalSemaphores;
+
+        VkSwapchainKHR swapChains[] =                  {swapchain_};
+        presentInfo.swapchainCount  =                             1;
+        presentInfo.pSwapchains     =                    swapChains;
+        presentInfo.pImageIndices   =                    imageIndex;
+
+        vkQueuePresentKHR(device_.get_present_queue(), &presentInfo);
+
+        currentframe_update();
+
+        return result;
     }
 
     void Swapchain::createSyncObjects() 
@@ -36,6 +117,7 @@ namespace VKSwapchain
         renderfinishedsemaphore_.resize(MAX_FRAMES_IN_FLIGHT);
         imageavailablesemaphore_.resize(MAX_FRAMES_IN_FLIGHT);
                   inflightfence_.resize(MAX_FRAMES_IN_FLIGHT);
+         imagesinflight_.resize(imageCount(), VK_NULL_HANDLE);
 
         VkSemaphoreCreateInfo semaphoreInfo{};
         semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -208,5 +290,7 @@ namespace VKSwapchain
 
         return details;
     }
+
+
 
 }   //  end of VKSwapchain namespace
